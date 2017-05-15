@@ -13,14 +13,37 @@ int get_random();
 void* create_server_connection(void* args);
 
 int server_port;
+char* file_to_read;
+
+int get_file_count(){
+   FILE *get_records;
+   int transaction_count=1;
+   get_records =fopen("transaction.txt","r");
+   if(!get_records){
+      printf("Unable to open file\n");
+   }
+   //Get the total number of lines i.e. accounts in the file.
+   int ch=0;
+   while(!feof(get_records)){
+      ch = fgetc(get_records);
+      if(ch=='\n'){
+         transaction_count++;
+      }
+   }
+   fclose(get_records);
+   return transaction_count;
+}
+
 
 int main(int argc, char const *argv[])
 {
-  if(argc < 1){
-    printf("Please provide the front end port number.\n");
+  if(argc < 2){
+    printf("Please provide the front end port number and file name.\n");
   }else{
     server_port = atoi(argv[1]);
   }
+  printf("Online Banking Application\n");
+  printf("file_to_read %s\n", file_to_read);
 
   pthread_t client_communication;
 
@@ -68,37 +91,46 @@ void* create_server_connection(void* args){
     perror("connect failed. Error");
   }
 
-  int request_type = get_request_type();
-  char type[10];
-  printf("Requesting for process %d\n",request_type);
-  if(request_type == 0){
-    int amount = get_random();
-    printf("CREATE %d\n",amount);
-    snprintf(type, sizeof(type), "%s", "CREATE");
-    snprintf(message, sizeof(message), "%s %d", request_type, amount);
-    int sendval = send(sock,&message,sizeof(message),0); 
-    if(sendval<0)
-        printf("Error in send");
-  }else if(request_type == 1){
-    int amount = get_random();
-    int account = get_random();
-    printf("UPDATE %d %d\n",account, amount);
-    snprintf(type, sizeof(type), "%s", "UPDATE");
-    snprintf(message, sizeof(message), "%s %d %d", request_type, account, amount);
-    int sendval = send(sock,&message,sizeof(message),0); 
-    if(sendval<0)
-        printf("Error in send");
-  }else if(request_type == 2){
-    printf("QUERYING\n");
-    int account = get_random();
-    printf("QUERY %d\n",account);
-    snprintf(type, sizeof(type), "%s", "QUERY");
-    snprintf(message, sizeof(message), "%s %d", request_type, account);
-    int sendval = send(sock,&message,sizeof(message),0); 
-    if(sendval<0)
-        printf("Error in send");
-  }else if(request_type == 3){
-    printf("QUIT\n");
-    
-  }
+  int amount = 50; int request_type = 0;
+  printf("CREATE %d\n",amount);
+  snprintf(message, sizeof(message), "%d %d", request_type, amount);
+  int sendval = send(sock,&message,sizeof(message),0); 
+  if(sendval<0)
+      printf("Error in send");
+
+
+
+  // for(int i=0;i<100;i++){
+  //     int request_type = get_request_type();
+  //     char type[10];
+  //     printf("Requesting for process %d\n",request_type);
+  //     if(request_type == 0){
+  //       int amount = get_random();
+  //       printf("CREATE %d\n",amount);
+  //       snprintf(message, sizeof(message), "%d %d", request_type, amount);
+  //       int sendval = send(sock,&message,sizeof(message),0); 
+  //       if(sendval<0)
+  //           printf("Error in send");
+  //     }else if(request_type == 1){
+  //       int amount = get_random();
+  //       int account = get_random();
+  //       printf("UPDATE %d %d\n",account, amount);
+  //       snprintf(message, sizeof(message), "%d %d %d", request_type, account, amount);
+  //       int sendval = send(sock,&message,sizeof(message),0); 
+  //       if(sendval<0)
+  //           printf("Error in send");
+  //     }else if(request_type == 2){
+  //       printf("QUERYING\n");
+  //       int account = get_random();
+  //       printf("QUERY %d\n",account);
+  //       snprintf(message, sizeof(message), "%d %d", request_type, account);
+  //       int sendval = send(sock,&message,sizeof(message),0); 
+  //       if(sendval<0)
+  //           printf("Error in send");
+  //     }else if(request_type == 3){
+  //       printf("QUIT\n");
+        
+  //     }
+  //     sleep(50);
+  // }
 }
