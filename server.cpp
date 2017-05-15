@@ -11,10 +11,9 @@ void *sendmessages(void *socket_desc);
 void *receivemessages(void *socket_desc);
 void create_sender_receiver_thread(short server_port, short connect_to_new);
 void *sendmessage_toclient(void *socket_desc);
-int compute_transaction(char* transaction);
+void compute_transaction(char* transaction,int client_sock);
 void write_to_file(int account_number, int transaction_amount);
 int read_from_file(int account_no);
-void update_file(int account_number, int transaction_amount);
 
 short server_port, connect_to;
 
@@ -133,14 +132,14 @@ void *receivemessages(void *args){
                 int strcompare = strcmp(client_message,"COMMIT");
                 if(strcompare == 0){
                     printf("Server will now compute\n");
-                    int resultval = compute_transaction(transaction);
-                    if(resultval == 1){
-                        printf("Computating result %s\n", result);
-                        int sendval = send(client_sock,&result,sizeof(result),0); 
-                        if(sendval<0){
-                            printf("ERrror in sending\n");
-                        }
-                    }
+                    compute_transaction(transaction,client_sock);
+                    // if(resultval == 1){
+                    //     printf("Computating result %s\n", result);
+                    //     int sendval = send(client_sock,&result,sizeof(result),0); 
+                    //     if(sendval<0){
+                    //         printf("ERrror in sending\n");
+                    //     }
+                    // }
                     
                 }
             }
@@ -153,7 +152,7 @@ void *receivemessages(void *args){
 }
 
 
-int compute_transaction(char* transaction){
+void compute_transaction(char* transaction,int client_sock){
     printf("compute transaction %s\n", transaction);
     char *type, *transaction_amount, *account_no;
     
@@ -168,9 +167,9 @@ int compute_transaction(char* transaction){
 
         bank_accounts[account_count].account_number = new_account_no;
         bank_accounts[account_count].account_amount = atoi(transaction_amount);
-        snprintf(result, sizeof(result), "%d",new_account_no);
+        snprintf(result, sizeof(result), "%s %d","OK",new_account_no);
         write_to_file(bank_accounts[account_count].account_number,bank_accounts[account_count].account_amount);
-        return 1;
+        
         
     }else if((strcmp(type,"UPDATE"))==0){
         transaction_amount = strtok(NULL," ");
@@ -190,13 +189,13 @@ int compute_transaction(char* transaction){
         int accountval = read_from_file(atoi(account_no));
         if(accountval == -1){
             printf("Account not present\n");
-            strcpy(result,"Err. Account not found");
+            snprintf(result, sizeof(result), "%s %s %s","ERR. Account",account_no,"not found.");
         }else{
             int new_transaction_amount = atoi(transaction_amount) + accountval;
-            update_file(atoi(account_no),new_transaction_amount);
-            snprintf(result, sizeof(result), "%d %d",new_account_no, accountval);
+            write_to_file(atoi(account_no),new_transaction_amount);
+            snprintf(result, sizeof(result), "%s %d","OK", accountval);
         }
-        return 1;
+        
     }else if((strcmp(type,"QUERY"))==0){
         account_no = strtok(NULL," ");
         // if(bank_accounts[account_count].account_number == 0){
@@ -209,11 +208,16 @@ int compute_transaction(char* transaction){
         int accountval = read_from_file(atoi(account_no));
         if(accountval == -1){
             printf("Account not present\n");
-            strcpy(result,"Err. Account not found");
+            snprintf(result, sizeof(result), "%s %s %s","ERR. Account",account_no,"not found.");
         }else{
-            snprintf(result, sizeof(result), "%d %d",new_account_no, accountval);
+            snprintf(result, sizeof(result), "%s %d","OK", accountval);
         }
-        return 1;
+        
+    }
+
+    int sendval = send(client_sock,&result,sizeof(result),0); 
+    if(sendval<0){
+        printf("ERrror in sending\n");
     }
 }
 
@@ -221,7 +225,7 @@ void write_to_file(int account_number, int transaction_amount){
     printf("Writing to file...\n");
     FILE * filename;
     char content[100];
-    snprintf(content, sizeof(content), "%d %d %s", account_number,transaction_amount,"\n");
+    snprintf(content, sizeof(content), "%s%d %d","\n",account_number,transaction_amount);
     //printf("Log file name %s\n",fname);
 
     char fname[200];
@@ -232,39 +236,21 @@ void write_to_file(int account_number, int transaction_amount){
     fclose(filename);
 }
 
-void update_file(int account_number, int transaction_amount){
-    printf("Updating file...\n");
-    FILE * filename;
-    char content[100];
-    snprintf(content, sizeof(content), "%d %d %s", account_number,transaction_amount,"\n");
-    //printf("Log file name %s\n",fname);
-
-    char fname[200];
-    snprintf(fname, sizeof(fname), "%s%d%s ","server",server_port ,".txt");
-    filename = fopen(fname, "r+");
-    if (filename == NULL) { /* Something is wrong   */}
-    int result = fseek(filename, 0, SEEK_END);
-    printf("result is \n"+result);
-    result = fprintf(filename, content);
-    result = fseek(filename, 0, SEEK_SET);
-    fclose(filename);
-}
-
 int read_from_file(int account_no){
     int transaction_amount;
     FILE *get_records; 
     char fname[200];char message[200];
     snprintf(fname, sizeof(fname), "%s%d%s ","server",server_port ,".txt");
-    get_records =fopen(fname,"r");
+    get_records =fopen(fname,"a+");
     if(!get_records)
     printf("Unable to open file\n");
+
     while(fgets(message,2000,get_records)){
       printf("Message %s\n", message);
       int acc_no = atoi(strtok(message, " "));
       if(acc_no == account_no){
         transaction_amount = atoi(strtok(NULL, " "));
         printf("Transaction amount is %d\n",transaction_amount);
-        break;
       }else{
         return -1;
       }

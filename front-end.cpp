@@ -12,7 +12,7 @@ int node_ports[3];
 int front_end_port;
 int last_created_account = 0;
 int accounts[1000];
-int number_of_nodes=2;
+int number_of_nodes=3;
 
 struct account_details{
     int account_no;
@@ -22,7 +22,7 @@ struct account_details{
 
 void front_end_processor();
 void* receivemessages(void* arg);
-void send_to_all_servers(char* message);
+void send_to_all_servers(char* message, int client_sock);
 int get_data(int connect_port, char * message);
 int get_random_server();
 int perform_two_phase_commit();
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 	front_end_port = atoi(argv[1]);
     node_ports[0] = atoi(argv[2]);
     node_ports[1] = atoi(argv[3]);
-    // node_ports[2] = atoi(argv[4]);
+    node_ports[2] = atoi(argv[4]);
 
     for(int i=0;i<number_of_nodes;i++){
         printf("Node port is %d\n", node_ports[i]);
@@ -102,20 +102,19 @@ void* receivemessages(void* arg){
                 if (filename == NULL) { /* Something is wrong   */}
                 fprintf(filename, content);
                 fclose(filename);
-                send_to_all_servers(message);  
+                send_to_all_servers(message,client_sock);  
             }
         }
     close(client_sock);
     }
  }
 
-int ready = 0, connected=0; 
-void send_to_all_servers(char* client_message){
+int ready = 0, connected=0; char servermessage[2000];
+void send_to_all_servers(char* client_message, int client_sock){
     //connect to the other two servers and initiate 2 phase commit
     int socket_desc , c , *new_sock,sock;
-    int client_sock;
     struct sockaddr_in data_server , client;
-    char initmessage[2000], servermessage[2000];
+    char initmessage[2000];
     strcpy(initmessage,client_message);
     printf("-------------------------------------------------------\n");
     printf("Connecting to other servers to initiate 2-phase commit.\n");
@@ -150,8 +149,8 @@ void send_to_all_servers(char* client_message){
                 int recn = recv(sockids[i], servermessage,2000,0);
                 if(recn > 0){
                     printf("Server %d message is %s\n",node_ports[i],servermessage);
+
                     ready++;
-               
             }
         }
     }
@@ -206,6 +205,10 @@ void send_to_all_servers(char* client_message){
 
         if(compute == ready){
             printf("Sending file to client..\n");
+            int sendval = send(client_sock,&servermessage,sizeof(servermessage),0); 
+            if(sendval<0){
+                printf("ERrror in sending\n");
+            }
         }
         }
     }else{

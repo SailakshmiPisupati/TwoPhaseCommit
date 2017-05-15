@@ -101,51 +101,12 @@ void* create_server_connection(void* args){
       int sendval = send(sock,&message,sizeof(message),0); 
       if(sendval<0)
        printf("Error in send");
-     sleep(20);
+      sleep(10);
+      int recn = recv(sock, server_reply,2000,0);
+      if(recn>0){
+          printf("%s\n", server_reply);
+      }else{
+        printf("Error in receiving server_reply.\n");
+      }
    }
-
-
-
-  // int amount = 50; int request_type = 0;
-  // printf("CREATE %d\n",amount);
-  // snprintf(message, sizeof(message), "%d %d", request_type, amount);
-  // int sendval = send(sock,&message,sizeof(message),0); 
-  // if(sendval<0)
-  //     printf("Error in send");
-
-
-
-  // for(int i=0;i<100;i++){
-  //     int request_type = get_request_type();
-  //     char type[10];
-  //     printf("Requesting for process %d\n",request_type);
-  //     if(request_type == 0){
-  //       int amount = get_random();
-  //       printf("CREATE %d\n",amount);
-  //       snprintf(message, sizeof(message), "%d %d", request_type, amount);
-  //       int sendval = send(sock,&message,sizeof(message),0); 
-  //       if(sendval<0)
-  //           printf("Error in send");
-  //     }else if(request_type == 1){
-  //       int amount = get_random();
-  //       int account = get_random();
-  //       printf("UPDATE %d %d\n",account, amount);
-  //       snprintf(message, sizeof(message), "%d %d %d", request_type, account, amount);
-  //       int sendval = send(sock,&message,sizeof(message),0); 
-  //       if(sendval<0)
-  //           printf("Error in send");
-  //     }else if(request_type == 2){
-  //       printf("QUERYING\n");
-  //       int account = get_random();
-  //       printf("QUERY %d\n",account);
-  //       snprintf(message, sizeof(message), "%d %d", request_type, account);
-  //       int sendval = send(sock,&message,sizeof(message),0); 
-  //       if(sendval<0)
-  //           printf("Error in send");
-  //     }else if(request_type == 3){
-  //       printf("QUIT\n");
-        
-  //     }
-  //     sleep(50);
-  // }
 }
