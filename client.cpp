@@ -35,12 +35,13 @@ int get_file_count(){
 }
 
 
-int main(int argc, char const *argv[])
+int main(int argc, char *argv[])
 {
   if(argc < 2){
     printf("Please provide the front end port number and file name.\n");
   }else{
     server_port = atoi(argv[1]);
+    file_to_read = argv[2];
   }
   printf("Online Banking Application\n");
   printf("file_to_read %s\n", file_to_read);
@@ -91,12 +92,26 @@ void* create_server_connection(void* args){
     perror("connect failed. Error");
   }
 
-  int amount = 50; int request_type = 0;
-  printf("CREATE %d\n",amount);
-  snprintf(message, sizeof(message), "%d %d", request_type, amount);
-  int sendval = send(sock,&message,sizeof(message),0); 
-  if(sendval<0)
-      printf("Error in send");
+  FILE *get_records; 
+  get_records =fopen(file_to_read,"r");
+  if(!get_records)
+    printf("Unable to open file\n");
+  while(fgets(message,2000,get_records)){
+      printf("Message %s\n", message);
+      int sendval = send(sock,&message,sizeof(message),0); 
+      if(sendval<0)
+       printf("Error in send");
+     sleep(20);
+   }
+
+
+
+  // int amount = 50; int request_type = 0;
+  // printf("CREATE %d\n",amount);
+  // snprintf(message, sizeof(message), "%d %d", request_type, amount);
+  // int sendval = send(sock,&message,sizeof(message),0); 
+  // if(sendval<0)
+  //     printf("Error in send");
 
 
 

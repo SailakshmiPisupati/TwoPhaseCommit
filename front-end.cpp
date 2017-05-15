@@ -136,38 +136,46 @@ void send_to_all_servers(char* client_message){
         if (connect(sock , (struct sockaddr *)&data_server , sizeof(data_server)) < 0){
         perror("connect failed. Error");
         }else{  
-            
-            
             printf("Sending message to servers %s\n", initmessage);
             int sendval = send(sock,&initmessage,sizeof(initmessage),0); 
+            struct timeval tv;
+            tv.tv_sec = 30;  /* 30 Secs Timeout */
+            setsockopt(sockids[i], SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
             if(sendval<0)
                 printf("Error in send");
             else{
                 connected++;
                 printf("Checking if servers are ready\n");
+                
+                int recn = recv(sockids[i], servermessage,2000,0);
+                if(recn > 0){
+                    printf("Server %d message is %s\n",node_ports[i],servermessage);
+                    ready++;
+               
             }
         }
     }
-    if(connected!=0){
-        time_t start;
-        time_t stop;
-        time(&start);
+    // if(connected!=0){
+    //     time_t start;
+    //     time_t stop;
+    //     time(&start);
         
-        int diff =0;
-        do{
-            time(&stop);
-            diff = difftime(stop, start);
-            printf("diff time is %d\n", diff);
-            for(int i=0;i<number_of_nodes;i++){
-            int recn = recv(sockids[i], servermessage,2000,0);
-            if(recn > 0){
-                printf("Server %d message is %s\n",node_ports[i],servermessage);
-                ready++;
-            } 
-        }
-        }while(diff<=30 || connected!=ready);
+    //     int diff =0;
+    //     do{
+    //         time(&stop);
+    //         diff = difftime(stop, start);
+    //         printf("diff time is %d\n", diff);
+    //         for(int i=0;i<number_of_nodes;i++){
+    //         int recn = recv(sockids[i], servermessage,2000,0);
+    //         if(recn > 0){
+    //             printf("Server %d message is %s\n",node_ports[i],servermessage);
+    //             ready++;
+    //         } 
+    //     }
+    //     }while(diff<=30 || connected!=ready);
         
     }
+    FILE * filename;
     int compute =0;
     if(connected ==  ready){
         printf("Connect count : %d and Ready count: %d\n", connected,ready);
@@ -184,6 +192,17 @@ void send_to_all_servers(char* client_message){
             compute++;
             printf("Server %d message is %s\n",node_ports[i],servermessage);
         } 
+        char content[100];
+        snprintf(content, sizeof(content), "%s %d %s %s %s", "Server ",node_ports[i]," message is",servermessage,"\n");
+        //printf("Log file name %s\n",fname);
+
+        char fname[200];
+        snprintf(fname, sizeof(fname), "%s " ,"front-end-response.log");
+        filename = fopen(fname, "a+");
+        if (filename == NULL) { /* Something is wrong   */}
+        fprintf(filename, content);
+        fclose(filename);
+
 
         if(compute == ready){
             printf("Sending file to client..\n");
