@@ -26,6 +26,7 @@ void send_to_all_servers(char* message, int client_sock);
 int get_data(int connect_port, char * message);
 int get_random_server();
 int perform_two_phase_commit();
+void * new_client_thread(void *client_sock);
 
 int main(int argc, char *argv[])
 {
@@ -55,9 +56,7 @@ void* receivemessages(void* arg){
 	int socket_desc , c , *new_sock;
     int client_sock;
     struct sockaddr_in server , client;
-    char message[2000];
-    FILE *filename;
-
+    
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
     if (socket_desc == -1)
     {
@@ -90,31 +89,46 @@ void* receivemessages(void* arg){
             perror("accept failed");
         }
         else{
-            while(recv(client_sock, message,2000,0)){
-                printf("***********************************************\n");
-                printf("Front end received message %s\n", message);
-                char content[100];
-                snprintf(content, sizeof(content), "%s %s %s", "Message received from client: ",message,"\n");
-                //printf("Log file name %s\n",fname);
-
-                char fname[200];
-                snprintf(fname, sizeof(fname), "%s " ,"front-end.log");
-                filename = fopen(fname, "a+");
-                if (filename == NULL) { /* Something is wrong   */}
-                fprintf(filename, content);
-                fclose(filename);
-                // pthread_t send_server;
-                // int n = pthread_create( &client_thread , NULL ,  receivemessages , NULL);      
-                // if( n  < 0){
-                //   perror("Could not create receiver thread");
-                // }
-                // pthread_join(client_thread, NULL);
-                send_to_all_servers(message,client_sock);
+           
+            pthread_t send_server;
+             new_sock = (int*)malloc(sizeof(int));
+            *new_sock = client_sock;
+            int n = pthread_create( &send_server , NULL ,  new_client_thread , (void*) new_sock);      
+            if( n  < 0){
+              perror("Could not create receiver thread");
             }
+            //pthread_join(send_server, NULL);
         }
-    
     }
     close(client_sock);
+
+ }
+
+
+ void * new_client_thread(void *new_sock){
+    printf("Creating new client thread..\n");
+    int client_sock = *(int*)new_sock;
+    printf("Client socket %d\n", client_sock);
+    char message[2000];
+    FILE *filename;
+
+    while(1){
+        recv(client_sock, message,2000,0);
+        printf("***********************************************\n");
+        printf("Front end received message %s\n", message);
+        char content[100];
+        snprintf(content, sizeof(content), "%s %s %s", "Message received from client: ",message,"\n");
+        //printf("Log file name %s\n",fname);
+
+        char fname[200];
+        snprintf(fname, sizeof(fname), "%s " ,"front-end.log");
+        filename = fopen(fname, "a+");
+        if (filename == NULL) { /* Something is wrong   */}
+        fprintf(filename, content);
+        fclose(filename);
+        
+        send_to_all_servers(message,client_sock);
+    }
  }
 
 int ready = 0, connected=0; char servermessage[2000];
@@ -141,85 +155,82 @@ void send_to_all_servers(char* client_message, int client_sock){
 
         //Connect to remote server
         if (connect(sock , (struct sockaddr *)&data_server , sizeof(data_server)) < 0){
-        perror("connect failed. Error");
+            printf("Error in connecting.\n");
         }else{  
             printf("Sending message to servers %s\n", initmessage);
             int sendval = send(sock,&initmessage,sizeof(initmessage),0); 
-            struct timeval tv;
-            tv.tv_sec = 30;  /* 30 Secs Timeout */
-            setsockopt(sockids[i], SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
             if(sendval<0)
                 printf("Error in send");
             else{
                 connected++;
                 printf("Checking if servers are ready\n");
-                
+                sleep(2);
                 int recn = recv(sockids[i], servermessage,2000,0);
                 if(recn > 0){
                     printf("Server %d message is %s\n",node_ports[i],servermessage);
-
                     ready++;
+                }else{
+                    printf("Error receiving ready to commit message from server.\n");
+                }
             }
-        }
+        }     
     }
-    // if(connected!=0){
-    //     time_t start;
-    //     time_t stop;
-    //     time(&start);
-        
-    //     int diff =0;
-    //     do{
-    //         time(&stop);
-    //         diff = difftime(stop, start);
-    //         printf("diff time is %d\n", diff);
-    //         for(int i=0;i<number_of_nodes;i++){
-    //         int recn = recv(sockids[i], servermessage,2000,0);
-    //         if(recn > 0){
-    //             printf("Server %d message is %s\n",node_ports[i],servermessage);
-    //             ready++;
-    //         } 
-    //     }
-    //     }while(diff<=30 || connected!=ready);
-        
+    for(int i=0;i<number_of_nodes;i++){
+        close(sockids[i]);
     }
     FILE * filename;
     int compute =0;
-    if(connected ==  ready){
-
+    if(ready > 1){
         printf("Connect count : %d and Ready count: %d\n", connected,ready);
         for(int i=0;i<number_of_nodes;i++){
-        // snprintf(initmessage, sizeof(initmessage), "%s %s", "COMMIT " ,initmessage);
-        strcpy(initmessage, "COMMIT");
-        printf("Sending commit to all servers.\n");
-        int sendval = send(sockids[i],&initmessage,sizeof(initmessage),0); 
-        if(sendval<0)
-            printf("Error in send");
-        bzero(servermessage,2000);
-        int recn = recv(sockids[i], servermessage,2000,0);
-        if(recn > 0){
-            compute++;
-            printf("Server %d message is %s\n",node_ports[i],servermessage);
-        } 
-        char content[100];
-        snprintf(content, sizeof(content), "%s %d %s %s %s", "Server ",node_ports[i]," message is",servermessage,"\n");
-        //printf("Log file name %s\n",fname);
-
-        char fname[200];
-        snprintf(fname, sizeof(fname), "%s " ,"front-end-response.log");
-        filename = fopen(fname, "a+");
-        if (filename == NULL) { /* Something is wrong   */}
-        fprintf(filename, content);
-        fclose(filename);
-
-
-        if(compute == ready){
-            ready = 0; connected =0; compute =0;
-            printf("Sending to client..\n");
-            int sendval = send(client_sock,&servermessage,sizeof(servermessage),0); 
-            if(sendval<0){
-                printf("Error in sending\n");
+            //connect to all the servers and ask if ready
+            sock = socket(AF_INET , SOCK_STREAM , 0);
+            //sockids[i] = sock;
+            if(sock == -1){
+            printf("Could not create socket");
             }
-        }
+            printf("Node port to connect %d\n", node_ports[i]);
+            data_server.sin_addr.s_addr = inet_addr("127.0.0.1");
+            data_server.sin_family = AF_INET;
+            data_server.sin_port = htons(node_ports[i]);
+            if (connect(sock , (struct sockaddr *)&data_server , sizeof(data_server)) < 0){
+                printf("Error in connecting.\n");
+            }else{
+                snprintf(initmessage, sizeof(initmessage), "%s %s", "COMMIT " ,client_message);
+                // strcpy(initmessage, "COMMIT");
+                printf("Sending commit to all servers.\n");
+                sockids[i] = sock;
+                int sendval = send(sockids[i],&initmessage,sizeof(initmessage),0); 
+                if(sendval<0)
+                    printf("Error in send");
+                bzero(servermessage,2000);
+                int recn = recv(sockids[i], servermessage,2000,0);
+                if(recn > 0){
+                    compute++;
+                    printf("Server %d message is %s\n",node_ports[i],servermessage);
+                } 
+                char content[100];
+                snprintf(content, sizeof(content), "%s %d %s %s %s", "Server ",node_ports[i]," message is",servermessage,"\n");
+                //printf("Log file name %s\n",fname);
+
+                char fname[200];
+                snprintf(fname, sizeof(fname), "%s " ,"front-end-response.log");
+                filename = fopen(fname, "a+");
+                if (filename == NULL) { /* Something is wrong   */}
+                fprintf(filename, content);
+                fclose(filename);
+
+                if(compute > 1){
+                    ready = 0; connected =0; compute =0;
+                    printf("Sending to client.%d\n",client_sock);
+                    
+                    int sendval = send(client_sock,&servermessage,sizeof(servermessage),0); 
+                    if(sendval<0){
+                        printf("Error in sending\n");
+                    }
+                }
+                close(sock);
+            }
         }
     }else{
         printf("Aborting transaction.\n");
