@@ -34,7 +34,6 @@ int get_file_count(){
    return transaction_count;
 }
 
-
 int main(int argc, char *argv[])
 {
   if(argc < 2){
@@ -101,12 +100,13 @@ void* create_server_connection(void* args){
       int sendval = send(sock,&message,sizeof(message),0); 
       if(sendval<0)
        printf("Error in send");
-      sleep(10);
+      sleep(5);
       int recn = recv(sock, server_reply,2000,0);
       if(recn>0){
           printf("%s\n", server_reply);
       }else{
         printf("Error in receiving server_reply.\n");
       }
+      sleep(5);
    }
 }

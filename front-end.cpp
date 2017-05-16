@@ -13,7 +13,7 @@ int front_end_port;
 int last_created_account = 0;
 int accounts[1000];
 int number_of_nodes=3;
-
+pthread_mutex_t lock_two_phase;
 struct account_details{
     int account_no;
     int account_status;
@@ -80,16 +80,17 @@ void* receivemessages(void* arg){
     
     //Listen
     listen(socket_desc , 50);
-    while(1){     
+    while((client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)))
+    {     
         //Accept and incoming connection
         // printf("Waiting for communication with the other nodes.\n"); 
-        client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
+        printf("Waiting for clients..\n");
+        // client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
         if (client_sock < 0){
             perror("accept failed");
         }
         else{
-            int recn = recv(client_sock, message,2000,0);
-            if(recn>0){
+            while(recv(client_sock, message,2000,0)){
                 printf("***********************************************\n");
                 printf("Front end received message %s\n", message);
                 char content[100];
@@ -102,11 +103,18 @@ void* receivemessages(void* arg){
                 if (filename == NULL) { /* Something is wrong   */}
                 fprintf(filename, content);
                 fclose(filename);
-                send_to_all_servers(message,client_sock);  
+                // pthread_t send_server;
+                // int n = pthread_create( &client_thread , NULL ,  receivemessages , NULL);      
+                // if( n  < 0){
+                //   perror("Could not create receiver thread");
+                // }
+                // pthread_join(client_thread, NULL);
+                send_to_all_servers(message,client_sock);
             }
         }
-    close(client_sock);
+    
     }
+    close(client_sock);
  }
 
 int ready = 0, connected=0; char servermessage[2000];
@@ -177,6 +185,7 @@ void send_to_all_servers(char* client_message, int client_sock){
     FILE * filename;
     int compute =0;
     if(connected ==  ready){
+
         printf("Connect count : %d and Ready count: %d\n", connected,ready);
         for(int i=0;i<number_of_nodes;i++){
         // snprintf(initmessage, sizeof(initmessage), "%s %s", "COMMIT " ,initmessage);
@@ -204,10 +213,11 @@ void send_to_all_servers(char* client_message, int client_sock){
 
 
         if(compute == ready){
-            printf("Sending file to client..\n");
+            ready = 0; connected =0; compute =0;
+            printf("Sending to client..\n");
             int sendval = send(client_sock,&servermessage,sizeof(servermessage),0); 
             if(sendval<0){
-                printf("ERrror in sending\n");
+                printf("Error in sending\n");
             }
         }
         }
