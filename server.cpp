@@ -178,7 +178,7 @@ void compute_transaction(char* transaction,int client_sock){
     
     
     printf("Type of request is %s\n", type);
-    if((strcmp(type,"CREATE"))==0){
+    if((strcmp(type,"CREATE"))==0 ||(strcmp(type,"Create"))==0||(strcmp(type,"create"))==0){
         pthread_mutex_lock(&lock_account);
         transaction_amount = strtok(NULL," ");
         new_account_no++;
@@ -187,7 +187,7 @@ void compute_transaction(char* transaction,int client_sock){
         snprintf(result, sizeof(result), "%s %d","OK",new_account_no);
         account_count++;
         pthread_mutex_unlock(&lock_account);
-    }else if((strcmp(type,"UPDATE"))==0){
+    }else if((strcmp(type,"UPDATE"))==0||(strcmp(type,"Update"))==0||(strcmp(type,"update"))==0){
         transaction_amount = strtok(NULL," ");
         account_no = strtok(NULL, "\n");
         int account_count = atoi(account_no);
@@ -203,7 +203,7 @@ void compute_transaction(char* transaction,int client_sock){
             snprintf(result, sizeof(result), "%s %d","OK", bank_accounts[account_count].account_amount);
             pthread_mutex_unlock(&lock_account);
         }
-    }else if((strcmp(type,"QUERY"))==0){
+    }else if((strcmp(type,"QUERY"))==0||(strcmp(type,"Query"))==0||(strcmp(type,"query"))==0){
         account_no = strtok(NULL," ");
         int account_count = atoi(account_no);
         if(bank_accounts[account_count].account_number == 0){

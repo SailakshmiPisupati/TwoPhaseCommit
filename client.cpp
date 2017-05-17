@@ -96,9 +96,9 @@ void* create_server_connection(void* args){
   if(!get_records)
     printf("Unable to open file\n");
   while(fgets(message,2000,get_records)){
-      //strcpy(message,strupr(message));
-      printf("-%s-\n", message);
-      if(strcmp(message,"QUIT\n")==0){
+      printf("%s", message);
+
+      if(strcmp(message,"QUIT\n")==0||strcmp(message,"QUIT")==0){
         printf("Closing session.\n");
         break;
       }else{
