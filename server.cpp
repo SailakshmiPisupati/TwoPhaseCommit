@@ -20,7 +20,8 @@ short server_port, connect_to;
 int total_messages=100, last_account_no =0; 
 int message_buffer[100];
 static int new_account_no =100, account_count =0; char result[2000];
-pthread_mutex_t lock_account;
+pthread_mutex_t lock_account = PTHREAD_MUTEX_INITIALIZER;
+char fname[200];
 
 struct account_details{
     int account_number;
@@ -39,18 +40,18 @@ int main(int argc , char *argv[]){
     connect_to = atoi(argv[2]);
     printf("In main thread.\n");
     FILE *fp;
-    char fname[200];
-    snprintf(fname, sizeof(fname), "%s%d%s ","server",server_port ,".txt");
+    
+    snprintf(fname, sizeof(fname), "%s%d%s ","server",server_port ,".log");
     fp = fopen(fname, "w");
     fclose(fp);
 
     int ret = remove(fname);
-
+    char fname[200];
+                    
     if(ret == 0){
         printf("File deleted successfully");
     }
     create_sender_receiver_thread(server_port, connect_to);               //sender is the server
-
     return 0;
 }
 
@@ -58,16 +59,11 @@ int main(int argc , char *argv[]){
 void create_sender_receiver_thread(short server_port,short connect_to){
     printf("In create receiver thread\n");
     pthread_t sniffer_thread;
-     // a thread to receive the incoming messages from other processes.
+     // a thread to receive the incoming messages from front-end application.
     int n = pthread_create( &sniffer_thread , NULL ,  receivemessages , NULL);      
     if( n  < 0){
       perror("Could not create receiver thread");
     }
-    // pthread_t sender_thread;
-    // if( pthread_create( &sender_thread , NULL ,  sendmessage_toclient , NULL) < 0){
-    //   perror("could not create thread");
-    // }
-    // pthread_join(sender_thread, NULL);
     pthread_join(sniffer_thread, NULL);
 }
 
@@ -79,7 +75,6 @@ void *receivemessages(void *args){
     struct sockaddr_in server , client;
     char client_message[2000], transaction[2000];
     FILE *filename;
-    printf("In receive messages thread.\n");
     //Create socket
     
     socket_desc = socket(AF_INET , SOCK_STREAM , 0);
@@ -117,40 +112,56 @@ void *receivemessages(void *args){
             int strcompare = strcmp(msg,"COMMIT");
             if(strcompare == 0){
                 char *new_transaction = strtok(NULL,"\n");
-                printf("new transaction is %s\n", new_transaction);
+                filename = fopen(fname,"a+");
+                fprintf(filename, "Server will now compute the values\n");
+                fclose(filename);
                 printf("Server will now compute\n");
                 compute_transaction(new_transaction,client_sock);
                 printf("Computating result %s\n", result);
                 int sendval = send(client_sock,&result,sizeof(result),0); 
                 if(sendval<0){
-                    printf("ERrror in sending\n");
+                    printf("Error in sending\n");
                 }
                 close(client_sock);   
             }else{
-                printf("***********************************************\n");
-                printf("Message received %s\n", transaction);
-                char content[100];
-                snprintf(content, sizeof(content), "%s %s %s", "Message received from front-end: ",transaction,"\n");
-                //printf("Log file name %s\n",fname);
-
-                char fname[200];
-                snprintf(fname, sizeof(fname), "%s%d%s ","server",server_port ,".log");
-                filename = fopen(fname, "a+");
-                if (filename == NULL) { /* Something is wrong   */}
-                fprintf(filename, content);
-                fclose(filename);
-                
-                strcpy(transaction,"READY TO COMMIT");
-                printf("Sending message %s to front end application. \n",transaction);
-                int n = send(client_sock,&transaction,sizeof(transaction),0); 
-                if(n<0)
-                    printf("Error in send");
-
-                int recn = recv(client_sock, transaction,2000,0);
-                if(recn>0){
-                    printf("Front end said to : %s\n",transaction);
+                printf("***********************************************\n");    
+                if(strcmp(transaction,"ABORT")==0){
+                    printf("Front end :%s\n", transaction);
+                    filename = fopen(fname,"a+");
+                    fprintf(filename, "Message from front-end is %s\n", transaction);
+                    fclose(filename);
+                }else{
+                    char *new_transaction = strtok(NULL,"\n");
+                    printf("Message from front-end %s\n", new_transaction);
+                    printf("Message received %s\n", new_transaction);
+                    filename = fopen(fname,"a+");
+                    fprintf(filename, "*********************************************\n");
+                    fprintf(filename, "Message from front-end is %s\n", new_transaction);
+                    fclose(filename);
+                    srand(time(NULL));
+                    int random = (rand() %10)+1;
+                    if(random%10==0){
+                        strcpy(transaction,"ABORT");
+                    }else{
+                        strcpy(transaction,"READY TO COMMIT");    
+                    }
+                    filename = fopen(fname,"a+");
+                    fprintf(filename, "Server will %s\n", transaction);
+                    fclose(filename);
                     
-                }
+                    printf("Sending message %s to front end application. \n",transaction);
+                    int n = send(client_sock,&transaction,sizeof(transaction),0); 
+                    if(n<0)
+                        printf("Error in send");
+
+                    int recn = recv(client_sock, transaction,2000,0);
+                    if(recn>0){
+                        printf("Front end said to : %s\n",transaction);
+                        filename = fopen(fname,"a+");
+                        fprintf(filename, "Server will %s\n", transaction);
+                        fclose(filename);
+                    }
+                }  
             } 
         }  
         }   
@@ -168,13 +179,14 @@ void compute_transaction(char* transaction,int client_sock){
     
     printf("Type of request is %s\n", type);
     if((strcmp(type,"CREATE"))==0){
+        pthread_mutex_lock(&lock_account);
         transaction_amount = strtok(NULL," ");
         new_account_no++;
-        bank_accounts[account_count].account_number = new_account_no;
-        bank_accounts[account_count].account_amount = atoi(transaction_amount);
-        //printf("New account number is %d and account value %d\n", new_account_no, bank_accounts[new_account_no].account_number);
+        bank_accounts[new_account_no].account_number = new_account_no;
+        bank_accounts[new_account_no].account_amount = atoi(transaction_amount);
         snprintf(result, sizeof(result), "%s %d","OK",new_account_no);
-        write_to_file(bank_accounts[account_count].account_number,bank_accounts[account_count].account_amount);
+        account_count++;
+        pthread_mutex_unlock(&lock_account);
     }else if((strcmp(type,"UPDATE"))==0){
         transaction_amount = strtok(NULL," ");
         account_no = strtok(NULL, "\n");
@@ -184,39 +196,23 @@ void compute_transaction(char* transaction,int client_sock){
             printf("Account not present.\n");
             snprintf(result, sizeof(result), "%s %s%s","Err. Account",account_no," not found");
         }else{
+            pthread_mutex_lock(&lock_account);
             int amount = bank_accounts[account_count].account_amount;
             amount = amount + (atoi(transaction_amount));
             bank_accounts[account_count].account_amount = amount;
             snprintf(result, sizeof(result), "%s %d","OK", bank_accounts[account_count].account_amount);
-            write_to_file(bank_accounts[account_count].account_number,bank_accounts[account_count].account_amount);
+            pthread_mutex_unlock(&lock_account);
         }
-        // int accountval = read_from_file(atoi(account_no));
-        // if(accountval == -1){
-        //     printf("Account not present\n");
-        //     snprintf(result, sizeof(result), "%s %s %s","ERR. Account",account_no,"not found.");
-        // }else{
-        //     int new_transaction_amount = atoi(transaction_amount) + accountval;
-        //     write_to_file(atoi(account_no),new_transaction_amount);
-        //     snprintf(result, sizeof(result), "%s %d","OK", new_transaction_amount);
-        // }
-        
     }else if((strcmp(type,"QUERY"))==0){
         account_no = strtok(NULL," ");
+        int account_count = atoi(account_no);
         if(bank_accounts[account_count].account_number == 0){
             printf("Account not present\n");
             snprintf(result, sizeof(result), "%s %s%s","Err. Account",account_no," not found");
         }else{
             int amount = bank_accounts[account_count].account_amount;
             snprintf(result, sizeof(result), "%s %d","OK", bank_accounts[account_count].account_amount);
-        }
-        // int accountval = read_from_file(atoi(account_no));
-        // if(accountval == -1){
-        //     printf("Account not present\n");
-        //     snprintf(result, sizeof(result), "%s %s %s","ERR. Account",account_no,"not found.");
-        // }else{
-        //     snprintf(result, sizeof(result), "%s %d","OK", accountval);
-        // }
-        
+        }    
     }
 
     int sendval = send(client_sock,&result,sizeof(result),0); 

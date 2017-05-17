@@ -96,17 +96,23 @@ void* create_server_connection(void* args){
   if(!get_records)
     printf("Unable to open file\n");
   while(fgets(message,2000,get_records)){
-      printf("Message %s\n", message);
-      int sendval = send(sock,&message,sizeof(message),0); 
-      if(sendval<0)
-       printf("Error in send");
-      sleep(5);
-      int recn = recv(sock, server_reply,2000,0);
-      if(recn>0){
-          printf("%s\n", server_reply);
+      //strcpy(message,strupr(message));
+      printf("-%s-\n", message);
+      if(strcmp(message,"QUIT\n")==0){
+        printf("Closing session.\n");
+        break;
       }else{
-        printf("Error in receiving server_reply.\n");
+        int sendval = send(sock,&message,sizeof(message),0); 
+        if(sendval<0)
+         printf("Error in send");
+        sleep(5);
+        int recn = recv(sock, server_reply,2000,0);
+        if(recn>0){
+            printf("%s\n", server_reply);
+        }else{
+          printf("Error in receiving server_reply.\n");
+        }
+        sleep(5);
       }
-      sleep(5);
    }
 }
